@@ -13,6 +13,21 @@
   <em>Inspired by <a href="https://openclaw.ai/">OpenClaw.ai</a></em>
 </p>
 
+## ClawSync Challenge
+
+**Win $500 + Swag + API Credits**
+
+Be one of the first three to deploy ClawSync and show it off. Post a live demo on X demonstrating at least three agent features.
+
+**Prizes:** $500 cash/gift card, swag, API credits
+
+**Requirements:**
+- Post a live demo video on X showing your deployed ClawSync agent
+- Demonstrate at least 3 different agent features (chat, skills, MCP, channels, X integration, etc.)
+- SyncBoard admin dashboard and Live Activity Feed do not count as features
+- Tag **@clawsync** and use **#ClawSyncChallenge**
+- First 3 valid submissions win
+
 ## Features
 
 - **Public Chat UI** - Clean, real-time chat with streaming responses
