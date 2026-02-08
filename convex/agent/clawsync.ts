@@ -15,7 +15,7 @@ import { anthropic } from '@ai-sdk/anthropic';
  */
 export const clawsyncAgent = new Agent(components.agent, {
   name: 'ClawSync Agent',
-  chat: anthropic('claude-sonnet-4-20250514') as any,
+  languageModel: anthropic('claude-sonnet-4-20250514'),
   instructions: 'You are a helpful AI assistant.',
   // Tools are loaded dynamically - see toolLoader.ts
   tools: {},
