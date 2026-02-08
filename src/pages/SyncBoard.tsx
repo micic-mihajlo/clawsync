@@ -11,7 +11,7 @@ import {
   ChatCircle,
   ClipboardText,
   Gear,
-  GitBranch,
+  TreeStructure,
 } from '@phosphor-icons/react';
 import './SyncBoard.css';
 
@@ -23,7 +23,7 @@ const navItems = [
   { path: '/syncboard/mcp', label: 'MCP Servers', Icon: Plug },
   { path: '/syncboard/channels', label: 'Channels', Icon: DeviceMobile },
   { path: '/syncboard/threads', label: 'Threads', Icon: ChatCircle },
-  { path: '/syncboard/automations', label: 'Automations', Icon: GitBranch },
+  { path: '/syncboard/automations', label: 'Automations', Icon: TreeStructure },
   { path: '/syncboard/activity', label: 'Activity Log', Icon: ClipboardText },
   { path: '/syncboard/config', label: 'Configuration', Icon: Gear },
 ];
