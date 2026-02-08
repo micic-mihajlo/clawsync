@@ -48,11 +48,62 @@ interface WorkflowNode {
   type: string;
 }
 
+// Connection: source -> output index -> list of target node names
+type ConnectionMap = Record<string, string[][]>;
+
 interface WorkflowDetail {
   id: string;
   name: string;
   active: boolean;
   nodes: WorkflowNode[];
+  connections: ConnectionMap;
+}
+
+// Build a tree structure from nodes + connections for rendering
+interface TreeNode {
+  name: string;
+  type: string;
+  children: TreeNode[][];  // each output branch is an array of chains
+}
+
+function buildTree(nodes: WorkflowNode[], connections: ConnectionMap): TreeNode[] {
+  const nodeMap = new Map(nodes.map(n => [n.name, n]));
+  // Find root nodes (nodes that are not targets of any connection)
+  const allTargets = new Set<string>();
+  for (const outputs of Object.values(connections)) {
+    for (const branch of outputs) {
+      for (const target of branch) {
+        allTargets.add(target);
+      }
+    }
+  }
+  const roots = nodes.filter(n => !allTargets.has(n.name));
+  if (roots.length === 0 && nodes.length > 0) roots.push(nodes[0]);
+
+  const visited = new Set<string>();
+
+  function buildNode(name: string): TreeNode | null {
+    if (visited.has(name)) return null;
+    visited.add(name);
+    const node = nodeMap.get(name);
+    if (!node) return null;
+
+    const outputs = connections[name] ?? [];
+    const children: TreeNode[][] = [];
+
+    for (const branch of outputs) {
+      const chain: TreeNode[] = [];
+      for (const target of branch) {
+        const child = buildNode(target);
+        if (child) chain.push(child);
+      }
+      if (chain.length > 0) children.push(chain);
+    }
+
+    return { name: node.name, type: node.type, children };
+  }
+
+  return roots.map(r => buildNode(r.name)).filter(Boolean) as TreeNode[];
 }
 
 /* ─── n8n API ─── */
@@ -142,6 +193,98 @@ const SUGGESTIONS = [
   'Slack bot that responds to messages with AI',
 ];
 
+/* ─── Pipeline Tree Renderer ─── */
+function NodeBox({ node }: { node: TreeNode }) {
+  return (
+    <div
+      className="auto-pipe-node"
+      style={{ '--node-color': getNodeColor(node.type) } as React.CSSProperties}
+    >
+      <div className="auto-pipe-node-ring" />
+      <div className="auto-pipe-node-body">
+        <span className="auto-pipe-node-name">{node.name}</span>
+        <span className="auto-pipe-node-type">{node.type}</span>
+      </div>
+    </div>
+  );
+}
+
+function Connector() {
+  return (
+    <div className="auto-pipe-connector">
+      <div className="auto-pipe-line" />
+      <div className="auto-pipe-arrow">▸</div>
+    </div>
+  );
+}
+
+function TreeChain({ nodes }: { nodes: TreeNode[] }) {
+  return (
+    <>
+      {nodes.map((node, i) => (
+        <div key={node.name} className="auto-pipe-step">
+          <NodeBox node={node} />
+          {/* If this node has branches, render them */}
+          {node.children.length > 1 ? (
+            <>
+              <Connector />
+              <div className="auto-pipe-branches">
+                {node.children.map((branch, bi) => (
+                  <div key={bi} className="auto-pipe-branch">
+                    <span className="auto-pipe-branch-label">
+                      {bi === 0 ? 'true' : bi === 1 ? 'false' : `out ${bi}`}
+                    </span>
+                    <div className="auto-pipe-branch-chain">
+                      <TreeChain nodes={branch} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : node.children.length === 1 ? (
+            <>
+              <Connector />
+              <TreeChain nodes={node.children[0]} />
+            </>
+          ) : (
+            // If not the last in chain, show connector
+            i < nodes.length - 1 && <Connector />
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function PipelineHero({ workflow, isGenerated }: { workflow: WorkflowDetail; isGenerated: boolean }) {
+  const hasBranches = Object.values(workflow.connections).some(
+    outputs => outputs.length > 1
+  );
+  const tree = buildTree(workflow.nodes, workflow.connections);
+
+  return (
+    <div className={`auto-pipeline-hero ${isGenerated ? 'generated' : ''}`}>
+      <div className="auto-pipeline-label">
+        <span className="auto-pipeline-name">{workflow.name}</span>
+        <span className={`auto-pipeline-status ${workflow.active ? 'active' : ''}`}>
+          {isGenerated ? '◆ preview' : workflow.active ? '● live' : '○ paused'}
+        </span>
+        <span className="auto-pipeline-count">
+          {workflow.nodes.length} nodes
+          {hasBranches && ' · branching'}
+        </span>
+      </div>
+      <div className="auto-pipeline-flow">
+        {tree.map((root, i) => (
+          <div key={i} className="auto-pipe-step">
+            <TreeChain nodes={[root]} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Component ─── */
 export function SyncBoardAutomations() {
   const generateWorkflow = useAction(api.automationGen.generateWorkflow);
@@ -209,6 +352,17 @@ export function SyncBoardAutomations() {
     setRefreshing(false);
   };
 
+  const parseConnections = (raw: any): ConnectionMap => {
+    const result: ConnectionMap = {};
+    for (const [source, data] of Object.entries(raw ?? {})) {
+      const outputs = (data as any).main ?? [];
+      result[source] = outputs.map((branch: any[]) =>
+        (branch ?? []).map((c: any) => c.node)
+      );
+    }
+    return result;
+  };
+
   const handleSelectWorkflow = async (id: string) => {
     setSelectedId(id);
     setGenResult(null);
@@ -223,6 +377,7 @@ export function SyncBoardAutomations() {
           name: n.name,
           type: (n.type ?? '').replace('n8n-nodes-base.', ''),
         })),
+        connections: parseConnections(data.connections),
       });
     }
   };
@@ -243,7 +398,6 @@ export function SyncBoardAutomations() {
 
       if (result.success && result.workflow) {
         setGenResult(result.workflow);
-        // Show the generated workflow in the pipeline view
         setSelectedWorkflow({
           id: 'generated',
           name: result.workflow.name,
@@ -252,6 +406,7 @@ export function SyncBoardAutomations() {
             name: n.name,
             type: (n.type ?? '').replace('n8n-nodes-base.', ''),
           })),
+          connections: parseConnections(result.workflow.connections),
         });
       } else {
         setGenError(result.error || 'Generation failed');
@@ -436,37 +591,10 @@ export function SyncBoardAutomations() {
 
         {/* Pipeline Hero */}
         {selectedWorkflow ? (
-          <div className={`auto-pipeline-hero ${genResult ? 'generated' : ''}`}>
-            <div className="auto-pipeline-label">
-              <span className="auto-pipeline-name">{selectedWorkflow.name}</span>
-              <span className={`auto-pipeline-status ${selectedWorkflow.active ? 'active' : ''}`}>
-                {genResult ? '◆ preview' : selectedWorkflow.active ? '● live' : '○ paused'}
-              </span>
-              <span className="auto-pipeline-count">{selectedWorkflow.nodes.length} nodes</span>
-            </div>
-            <div className="auto-pipeline-flow">
-              {selectedWorkflow.nodes.map((node, i) => (
-                <div key={i} className="auto-pipe-step">
-                  <div
-                    className="auto-pipe-node"
-                    style={{ '--node-color': getNodeColor(node.type) } as React.CSSProperties}
-                  >
-                    <div className="auto-pipe-node-ring" />
-                    <div className="auto-pipe-node-body">
-                      <span className="auto-pipe-node-name">{node.name}</span>
-                      <span className="auto-pipe-node-type">{node.type}</span>
-                    </div>
-                  </div>
-                  {i < selectedWorkflow.nodes.length - 1 && (
-                    <div className="auto-pipe-connector">
-                      <div className="auto-pipe-line" />
-                      <div className="auto-pipe-arrow">▸</div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <PipelineHero
+            workflow={selectedWorkflow}
+            isGenerated={!!genResult}
+          />
         ) : !generating ? (
           <div className="auto-pipeline-empty">
             <Lightning size={32} weight="duotone" />
