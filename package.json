@@ -24,6 +24,7 @@
     "ai": "^6.0.77",
     "convex": "^1.31.7",
     "convex-helpers": "^0.1.111",
+    "geist": "^1.7.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.3",

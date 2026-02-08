@@ -7,13 +7,14 @@ import {
   Pause,
   CheckCircle,
   XCircle,
-  Clock,
   ArrowsClockwise,
   GitBranch,
   Globe,
   Envelope,
   Eye,
   Timer,
+  CaretDown,
+  CaretUp,
 } from '@phosphor-icons/react';
 
 interface Workflow {
@@ -47,7 +48,6 @@ interface WorkflowDetail {
   nodes: WorkflowNode[];
 }
 
-// n8n API — proxied through vite dev server to avoid CORS
 const N8N_API_KEY = import.meta.env.VITE_N8N_API_KEY || '';
 
 async function n8nFetch(path: string): Promise<any> {
@@ -63,30 +63,63 @@ async function n8nFetch(path: string): Promise<any> {
   }
 }
 
+const NODE_COLORS: Record<string, string> = {
+  'webhook': '#ea5b26',
+  'httpRequest': '#3b82f6',
+  'filter': '#f59e0b',
+  'set': '#8b5cf6',
+  'if': '#f59e0b',
+  'code': '#10b981',
+  'function': '#10b981',
+  'schedule': '#6366f1',
+  'cron': '#6366f1',
+  'discord': '#5865F2',
+  'slack': '#4A154B',
+  'telegram': '#229ED9',
+  'gmail': '#EA4335',
+  'httpRequest': '#3b82f6',
+};
+
+function getNodeColor(type: string): string {
+  const lower = type.toLowerCase();
+  for (const [key, color] of Object.entries(NODE_COLORS)) {
+    if (lower.includes(key)) return color;
+  }
+  return '#6a6a6a';
+}
+
 export function SyncBoardAutomations() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowDetail | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [showExecs, setShowExecs] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
     const [wfData, execData] = await Promise.all([
       n8nFetch('/workflows'),
-      n8nFetch('/executions?limit=20'),
+      n8nFetch('/executions?limit=15'),
     ]);
 
     if (wfData) {
       setConnected(true);
-      setWorkflows((wfData.data ?? []).map((w: any) => ({
+      const wfs = (wfData.data ?? []).map((w: any) => ({
         id: w.id,
         name: w.name,
         active: w.active,
         createdAt: w.createdAt,
         updatedAt: w.updatedAt,
         nodeCount: w.nodes?.length ?? 0,
-      })));
+      }));
+      setWorkflows(wfs);
+      // Auto-select first active workflow
+      if (!selectedId && wfs.length > 0) {
+        const first = wfs.find((w: Workflow) => w.active) ?? wfs[0];
+        handleSelectWorkflow(first.id);
+      }
     }
 
     if (execData) {
@@ -105,14 +138,8 @@ export function SyncBoardAutomations() {
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
-
-  const handleViewWorkflow = async (id: string) => {
+  const handleSelectWorkflow = async (id: string) => {
+    setSelectedId(id);
     const data = await n8nFetch(`/workflows/${id}`);
     if (data) {
       setSelectedWorkflow({
@@ -127,30 +154,16 @@ export function SyncBoardAutomations() {
     }
   };
 
-  const getWorkflowIcon = (name: string) => {
-    const lower = name.toLowerCase();
-    if (lower.includes('github') || lower.includes('git') || lower.includes('code')) return <GitBranch size={20} weight="regular" />;
-    if (lower.includes('webhook')) return <Globe size={20} weight="regular" />;
-    if (lower.includes('email') || lower.includes('mail')) return <Envelope size={20} weight="regular" />;
-    if (lower.includes('monitor') || lower.includes('health') || lower.includes('uptime')) return <Eye size={20} weight="regular" />;
-    if (lower.includes('morning') || lower.includes('schedule') || lower.includes('cron')) return <Timer size={20} weight="regular" />;
-    return <Lightning size={20} weight="regular" />;
-  };
+  useEffect(() => { fetchData(); }, []);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <span className="auto-badge auto-badge-success"><CheckCircle size={12} /> Success</span>;
-      case 'error':
-      case 'crashed':
-        return <span className="auto-badge auto-badge-error"><XCircle size={12} /> Failed</span>;
-      case 'running':
-        return <span className="auto-badge auto-badge-running"><ArrowsClockwise size={12} /> Running</span>;
-      case 'waiting':
-        return <span className="auto-badge auto-badge-waiting"><Clock size={12} /> Waiting</span>;
-      default:
-        return <span className="auto-badge">{status}</span>;
-    }
+  const getWfIcon = (name: string) => {
+    const lower = name.toLowerCase();
+    if (lower.includes('github') || lower.includes('git') || lower.includes('code')) return <GitBranch size={16} weight="bold" />;
+    if (lower.includes('webhook')) return <Globe size={16} weight="bold" />;
+    if (lower.includes('email') || lower.includes('mail')) return <Envelope size={16} weight="bold" />;
+    if (lower.includes('monitor') || lower.includes('health') || lower.includes('uptime')) return <Eye size={16} weight="bold" />;
+    if (lower.includes('morning') || lower.includes('schedule')) return <Timer size={16} weight="bold" />;
+    return <Lightning size={16} weight="bold" />;
   };
 
   const formatTime = (dateStr: string) => {
@@ -171,139 +184,139 @@ export function SyncBoardAutomations() {
     const ms = new Date(end).getTime() - new Date(start).getTime();
     if (ms < 1000) return `${ms}ms`;
     if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+    return `${Math.floor(ms / 60000)}m`;
   };
 
   const activeCount = workflows.filter(w => w.active).length;
-  const successCount = executions.filter(e => e.status === 'success').length;
-  const failCount = executions.filter(e => e.status === 'error' || e.status === 'crashed').length;
+
+  if (loading) {
+    return (
+      <SyncBoardLayout title="Automations">
+        <div className="auto-loading-screen">
+          <div className="auto-loading-pulse" />
+          <span className="auto-loading-text">connecting to n8n...</span>
+        </div>
+      </SyncBoardLayout>
+    );
+  }
+
+  if (!connected) {
+    return (
+      <SyncBoardLayout title="Automations">
+        <div className="auto-disconnected">
+          <Lightning size={40} weight="duotone" />
+          <h3>n8n not connected</h3>
+          <p>Set <code>VITE_N8N_API_URL</code> and <code>VITE_N8N_API_KEY</code> to connect your automation engine.</p>
+        </div>
+      </SyncBoardLayout>
+    );
+  }
 
   return (
-    <SyncBoardLayout title="Automations (n8n)">
-      <div className="automations-page">
-        {/* Stats Bar */}
-        <div className="auto-stats">
-          <div className="auto-stat">
-            <span className="auto-stat-value">{workflows.length}</span>
-            <span className="auto-stat-label">Workflows</span>
+    <SyncBoardLayout title="Automations">
+      <div className="auto-page">
+        {/* Header with pixel font */}
+        <div className="auto-header">
+          <div className="auto-header-left">
+            <h2 className="auto-title">
+              <span className="auto-title-pixel">{workflows.length}</span> workflows
+              <span className="auto-title-dot">·</span>
+              <span className="auto-title-pixel auto-title-active">{activeCount}</span> active
+            </h2>
           </div>
-          <div className="auto-stat">
-            <span className="auto-stat-value auto-stat-active">{activeCount}</span>
-            <span className="auto-stat-label">Active</span>
-          </div>
-          <div className="auto-stat">
-            <span className="auto-stat-value auto-stat-success">{successCount}</span>
-            <span className="auto-stat-label">Successful</span>
-          </div>
-          <div className="auto-stat">
-            <span className="auto-stat-value auto-stat-error">{failCount}</span>
-            <span className="auto-stat-label">Failed</span>
-          </div>
-          <button 
-            className="btn btn-ghost btn-sm auto-refresh"
-            onClick={handleRefresh}
+          <button
+            className="auto-refresh-btn"
+            onClick={() => { setRefreshing(true); fetchData(); }}
             disabled={refreshing}
           >
-            <ArrowsClockwise size={16} className={refreshing ? 'spinning' : ''} /> Refresh
+            <ArrowsClockwise size={14} className={refreshing ? 'spinning' : ''} />
           </button>
         </div>
 
-        {loading ? (
-          <div className="auto-loading">Connecting to n8n...</div>
-        ) : !connected ? (
-          <div className="auto-empty">
-            <Lightning size={32} weight="regular" style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-            <p>Could not connect to n8n instance.</p>
-            <p style={{ fontSize: '0.75rem' }}>Set <code>VITE_N8N_API_URL</code> and <code>VITE_N8N_API_KEY</code> in your environment.</p>
-          </div>
-        ) : (
-          <div className="auto-content">
-            {/* Workflows */}
-            <section className="auto-section">
-              <h3 className="auto-section-title">Workflows</h3>
-              <div className="auto-workflow-grid">
-                {workflows.map(wf => (
-                  <div key={wf.id} className={`auto-workflow-card ${wf.active ? 'active' : 'inactive'}`}>
-                    <div className="auto-wf-header">
-                      <div className="auto-wf-icon">{getWorkflowIcon(wf.name)}</div>
-                      <div className="auto-wf-info">
-                        <h4 className="auto-wf-name">{wf.name}</h4>
-                        <span className="auto-wf-meta">{wf.nodeCount} nodes · Updated {formatTime(wf.updatedAt)}</span>
-                      </div>
-                      <div className="auto-wf-status">
-                        {wf.active ? (
-                          <span className="auto-badge auto-badge-success"><Play size={12} /> Active</span>
-                        ) : (
-                          <span className="auto-badge auto-badge-inactive"><Pause size={12} /> Inactive</span>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      className="btn btn-ghost btn-sm auto-view-btn"
-                      onClick={() => handleViewWorkflow(wf.id)}
-                    >
-                      View Pipeline →
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Workflow Detail — Pipeline View */}
-            {selectedWorkflow && (
-              <section className="auto-section">
-                <h3 className="auto-section-title">
-                  {selectedWorkflow.name} — Pipeline
-                </h3>
-                <div className="auto-pipeline">
-                  {selectedWorkflow.nodes.map((node, i) => (
-                    <div key={i} className="auto-pipeline-node">
-                      <div className="auto-node-dot" />
-                      <div className="auto-node-info">
-                        <span className="auto-node-name">{node.name}</span>
-                        <span className="auto-node-type">{node.type}</span>
-                      </div>
-                      {i < selectedWorkflow.nodes.length - 1 && (
-                        <div className="auto-node-arrow">→</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Recent Executions */}
-            <section className="auto-section">
-              <h3 className="auto-section-title">Recent Executions</h3>
-              {executions.length > 0 ? (
-                <table className="auto-exec-table">
-                  <thead>
-                    <tr>
-                      <th>Workflow</th>
-                      <th>Status</th>
-                      <th>Started</th>
-                      <th>Duration</th>
-                      <th>Mode</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {executions.map(exec => (
-                      <tr key={exec.id}>
-                        <td className="auto-exec-name">{exec.workflowName}</td>
-                        <td>{getStatusBadge(exec.status)}</td>
-                        <td className="auto-exec-time">{formatTime(exec.startedAt)}</td>
-                        <td className="auto-exec-duration">{getDuration(exec.startedAt, exec.stoppedAt)}</td>
-                        <td><span className="auto-badge">{exec.mode}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* Workflow selector strip */}
+        <div className="auto-wf-strip">
+          {workflows.map(wf => (
+            <button
+              key={wf.id}
+              className={`auto-wf-chip ${selectedId === wf.id ? 'selected' : ''} ${wf.active ? '' : 'inactive'}`}
+              onClick={() => handleSelectWorkflow(wf.id)}
+            >
+              <span className="auto-wf-chip-icon">{getWfIcon(wf.name)}</span>
+              <span className="auto-wf-chip-name">{wf.name}</span>
+              {wf.active ? (
+                <Play size={10} weight="fill" className="auto-wf-chip-status" />
               ) : (
-                <div className="auto-empty">No recent executions yet.</div>
+                <Pause size={10} weight="fill" className="auto-wf-chip-status inactive" />
               )}
-            </section>
+            </button>
+          ))}
+        </div>
+
+        {/* Pipeline Hero */}
+        {selectedWorkflow && (
+          <div className="auto-pipeline-hero">
+            <div className="auto-pipeline-label">
+              <span className="auto-pipeline-name">{selectedWorkflow.name}</span>
+              <span className={`auto-pipeline-status ${selectedWorkflow.active ? 'active' : ''}`}>
+                {selectedWorkflow.active ? '● live' : '○ paused'}
+              </span>
+            </div>
+            <div className="auto-pipeline-flow">
+              {selectedWorkflow.nodes.map((node, i) => (
+                <div key={i} className="auto-pipe-step">
+                  <div
+                    className="auto-pipe-node"
+                    style={{ '--node-color': getNodeColor(node.type) } as React.CSSProperties}
+                  >
+                    <div className="auto-pipe-node-ring" />
+                    <div className="auto-pipe-node-body">
+                      <span className="auto-pipe-node-name">{node.name}</span>
+                      <span className="auto-pipe-node-type">{node.type}</span>
+                    </div>
+                  </div>
+                  {i < selectedWorkflow.nodes.length - 1 && (
+                    <div className="auto-pipe-connector">
+                      <div className="auto-pipe-line" />
+                      <div className="auto-pipe-arrow">▸</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
+        {/* Executions — collapsible */}
+        <div className="auto-execs-section">
+          <button className="auto-execs-toggle" onClick={() => setShowExecs(!showExecs)}>
+            <span className="auto-execs-toggle-label">
+              Recent Executions
+              <span className="auto-execs-count">{executions.length}</span>
+            </span>
+            {showExecs ? <CaretUp size={14} /> : <CaretDown size={14} />}
+          </button>
+
+          {showExecs && (
+            <div className="auto-execs-list">
+              {executions.map(exec => (
+                <div key={exec.id} className="auto-exec-row">
+                  <span className="auto-exec-wf">{exec.workflowName}</span>
+                  <span className={`auto-exec-status ${exec.status}`}>
+                    {exec.status === 'success' ? <CheckCircle size={12} weight="fill" /> :
+                     exec.status === 'error' || exec.status === 'crashed' ? <XCircle size={12} weight="fill" /> :
+                     <ArrowsClockwise size={12} />}
+                    {exec.status}
+                  </span>
+                  <span className="auto-exec-meta">{formatTime(exec.startedAt)}</span>
+                  <span className="auto-exec-meta">{getDuration(exec.startedAt, exec.stoppedAt)}</span>
+                </div>
+              ))}
+              {executions.length === 0 && (
+                <div className="auto-exec-empty">No executions yet</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </SyncBoardLayout>
   );
