@@ -15,6 +15,7 @@ import {
   ClipboardText,
   Gear,
   EnvelopeSimple,
+  TreeStructure,
 } from '@phosphor-icons/react';
 import './SyncBoardLayout.css';
 
@@ -29,6 +30,7 @@ const navItems = [
   { path: '/syncboard/agentmail', label: 'AgentMail', Icon: EnvelopeSimple },
   { path: '/syncboard/api', label: 'API Keys', Icon: Key },
   { path: '/syncboard/threads', label: 'Threads', Icon: ChatCircle },
+  { path: '/syncboard/automations', label: 'Automations', Icon: TreeStructure },
   { path: '/syncboard/activity', label: 'Activity Log', Icon: ClipboardText },
   { path: '/syncboard/config', label: 'Configuration', Icon: Gear },
 ];
