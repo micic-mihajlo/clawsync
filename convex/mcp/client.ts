@@ -21,15 +21,15 @@ export const fetchTools = internalAction({
   args: {
     serverId: v.id('mcpServers'),
   },
-  handler: async (ctx, args) => {
-    const server = await ctx.runQuery(internal.mcpServers.getById, { id: args.serverId });
+  handler: async (ctx, args): Promise<any[]> => {
+    const server: any = await ctx.runQuery(internal.mcpServers.getById, { id: args.serverId });
 
     if (!server || !server.url) {
       throw new Error('Server not found or no URL configured');
     }
 
     try {
-      const response = await fetch(server.url, {
+      const response: Response = await fetch(server.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'tools/list', params: {} }),
@@ -39,7 +39,7 @@ export const fetchTools = internalAction({
         throw new Error(`Failed to fetch tools: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data: any = await response.json();
       return data.tools || [];
     } catch (error) {
       console.error('MCP client error:', error);
@@ -55,8 +55,8 @@ export const callTool = internalAction({
     toolName: v.string(),
     toolArgs: v.any(),
   },
-  handler: async (ctx, args) => {
-    const server = await ctx.runQuery(internal.mcpServers.getById, { id: args.serverId });
+  handler: async (ctx, args): Promise<any> => {
+    const server: any = await ctx.runQuery(internal.mcpServers.getById, { id: args.serverId });
 
     if (!server || !server.url) {
       throw new Error('Server not found or no URL configured');
@@ -71,7 +71,7 @@ export const callTool = internalAction({
     }
 
     try {
-      const response = await fetch(server.url, {
+      const response: Response = await fetch(server.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

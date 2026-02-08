@@ -8,7 +8,6 @@ import {
   Trash,
   Star,
   PaperPlaneTilt,
-  ArrowsClockwise,
 } from '@phosphor-icons/react';
 
 export function SyncBoardAgentMail() {
@@ -219,7 +218,7 @@ export function SyncBoardAgentMail() {
             {/* Inbox List */}
             <div className="inbox-list">
               {inboxes && inboxes.length > 0 ? (
-                inboxes.map((inbox) => (
+                inboxes.map((inbox: any) => (
                   <div key={inbox._id} className="inbox-card">
                     <div className="inbox-icon">
                       <EnvelopeSimple size={24} weight="regular" />
@@ -273,7 +272,7 @@ export function SyncBoardAgentMail() {
               <span className="badge">{messages.length}</span>
             </div>
             <div className="message-list">
-              {messages.map((msg) => (
+              {messages.map((msg: any) => (
                 <div key={msg._id} className="message-card">
                   <div className="message-icon">
                     {msg.direction === 'inbound' ? (

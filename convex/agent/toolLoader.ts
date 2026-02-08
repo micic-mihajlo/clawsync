@@ -1,7 +1,7 @@
 import { ActionCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc } from '../_generated/dataModel';
-import { tool as createTool } from 'ai';
+import { tool as createTool, type Tool } from 'ai';
 import { z } from 'zod';
 import { checkSecurity, truncateForLog } from './security';
 
@@ -15,7 +15,8 @@ import { checkSecurity, truncateForLog } from './security';
  * All tools pass through the security checker before execution.
  */
 
-export type ToolSet = Record<string, ReturnType<typeof createTool>>;
+type AnyTool = Tool<any, any>;
+export type ToolSet = Record<string, AnyTool>;
 
 /**
  * Load all tools for the agent
@@ -49,7 +50,7 @@ export async function loadTools(ctx: ActionCtx): Promise<ToolSet> {
 function createToolFromSkill(
   ctx: ActionCtx,
   skill: Doc<'skillRegistry'>
-): ReturnType<typeof createTool> | null {
+): any {
   switch (skill.skillType) {
     case 'template':
       return createTemplateSkillTool(ctx, skill);
@@ -70,13 +71,13 @@ function createToolFromSkill(
 function createTemplateSkillTool(
   ctx: ActionCtx,
   skill: Doc<'skillRegistry'>
-): ReturnType<typeof createTool> {
+): any {
   return createTool({
     description: skill.description,
     parameters: z.object({
       input: z.string().describe('Input for the skill'),
     }),
-    execute: async ({ input }) => {
+    execute: async ({ input }: { input: string }) => {
       const startTime = Date.now();
 
       // Security check
@@ -114,13 +115,13 @@ function createTemplateSkillTool(
 function createWebhookSkillTool(
   ctx: ActionCtx,
   skill: Doc<'skillRegistry'>
-): ReturnType<typeof createTool> {
+): any {
   return createTool({
     description: skill.description,
     parameters: z.object({
       input: z.string().describe('Input for the webhook'),
     }),
-    execute: async ({ input }) => {
+    execute: async ({ input }: { input: string }) => {
       const startTime = Date.now();
 
       // Parse config for URL
@@ -163,13 +164,13 @@ function createWebhookSkillTool(
 function createCodeSkillTool(
   ctx: ActionCtx,
   skill: Doc<'skillRegistry'>
-): ReturnType<typeof createTool> {
+): any {
   return createTool({
     description: skill.description,
     parameters: z.object({
       query: z.string().describe('Query input'),
     }),
-    execute: async ({ query }) => {
+    execute: async ({ query }: { query: string }) => {
       const startTime = Date.now();
 
       // Security check

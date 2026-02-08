@@ -3,7 +3,7 @@ import { internal } from '../_generated/api';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { LanguageModelV1 } from 'ai';
+import type { LanguageModel } from 'ai';
 
 /**
  * Model Router
@@ -26,7 +26,7 @@ export interface ModelConfig {
 }
 
 export interface ResolvedModel {
-  model: LanguageModelV1;
+  model: LanguageModel;
   provider: string;
   modelId: string;
   isFallback: boolean;
@@ -40,9 +40,8 @@ export async function resolveModel(ctx: ActionCtx): Promise<ResolvedModel> {
   const config = await ctx.runQuery(internal.agentConfig.getConfig);
 
   if (!config) {
-    // Default to Claude Sonnet if no config
     return {
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic('claude-sonnet-4-20250514') as unknown as LanguageModel,
       provider: 'anthropic',
       modelId: 'claude-sonnet-4-20250514',
       isFallback: false,
@@ -70,9 +69,8 @@ export async function resolveModel(ctx: ActionCtx): Promise<ResolvedModel> {
       };
     }
 
-    // Default fallback
     return {
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic('claude-sonnet-4-20250514') as unknown as LanguageModel,
       provider: 'anthropic',
       modelId: 'claude-sonnet-4-20250514',
       isFallback: true,
@@ -83,13 +81,13 @@ export async function resolveModel(ctx: ActionCtx): Promise<ResolvedModel> {
 /**
  * Create an AI SDK model instance from provider and model ID
  */
-function createModel(provider: string, modelId: string): LanguageModelV1 {
+function createModel(provider: string, modelId: string): LanguageModel {
   switch (provider) {
     case 'anthropic':
-      return anthropic(modelId);
+      return anthropic(modelId) as unknown as LanguageModel;
 
     case 'openai':
-      return openai(modelId);
+      return openai(modelId) as unknown as LanguageModel;
 
     case 'openrouter': {
       const openrouter = createOpenAICompatible({
@@ -100,7 +98,7 @@ function createModel(provider: string, modelId: string): LanguageModelV1 {
           'X-Title': 'ClawSync',
         },
       });
-      return openrouter(modelId);
+      return openrouter(modelId) as unknown as LanguageModel;
     }
 
     case 'opencode-zen': {
@@ -108,23 +106,20 @@ function createModel(provider: string, modelId: string): LanguageModelV1 {
         name: 'opencode-zen',
         baseURL: 'https://opencode.ai/zen/v1',
       });
-      return opencodeZen(modelId);
+      return opencodeZen(modelId) as unknown as LanguageModel;
     }
 
     case 'custom': {
-      // For custom providers, the modelId should include the base URL
-      // Format: "baseUrl::modelId"
       const [baseUrl, actualModelId] = modelId.split('::');
       const customProvider = createOpenAICompatible({
         name: 'custom',
         baseURL: baseUrl,
       });
-      return customProvider(actualModelId);
+      return customProvider(actualModelId) as unknown as LanguageModel;
     }
 
     default:
-      // Default to Anthropic
-      return anthropic(modelId);
+      return anthropic(modelId) as unknown as LanguageModel;
   }
 }
 

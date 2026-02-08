@@ -1,8 +1,5 @@
-'use node';
-
 import { query, mutation, internalQuery, internalMutation } from './_generated/server';
 import { v } from 'convex/values';
-import { clawsyncAgent } from './agent/clawsync';
 
 /**
  * Thread Management
@@ -18,12 +15,12 @@ export const list = internalQuery({
   },
   handler: async (ctx, args) => {
     // Get threads from agent's thread table
-    const threads = await ctx.db
+    const threads = await (ctx.db as any)
       .query('agent_threads')
       .order('desc')
       .take(args.limit ?? 20);
 
-    return threads.map((t) => ({
+    return (threads as any[]).map((t: any) => ({
       threadId: t._id,
       createdAt: t._creationTime,
       metadata: t.metadata,
@@ -38,13 +35,13 @@ export const getMessages = internalQuery({
   },
   handler: async (ctx, args) => {
     // Get messages from agent's messages table
-    const messages = await ctx.db
+    const messages = await (ctx.db as any)
       .query('agent_messages')
-      .filter((q) => q.eq(q.field('threadId'), args.threadId))
+      .filter((q: any) => q.eq(q.field('threadId'), args.threadId))
       .order('asc')
       .take(100);
 
-    return messages.map((m) => ({
+    return (messages as any[]).map((m: any) => ({
       id: m._id,
       role: m.role,
       content: m.content,
@@ -60,7 +57,7 @@ export const create = internalMutation({
   },
   handler: async (ctx, args) => {
     // Insert a new thread record
-    const threadId = await ctx.db.insert('agent_threads' as any, {
+    const threadId = await (ctx.db as any).insert('agent_threads', {
       metadata: args.metadata ?? {},
       status: 'active',
     });
@@ -78,12 +75,12 @@ export const listPublic = query({
   },
   handler: async (ctx, args) => {
     try {
-      const threads = await ctx.db
+      const threads = await (ctx.db as any)
         .query('agent_threads')
         .order('desc')
         .take(args.limit ?? 20);
 
-      return threads.map((t) => ({
+      return (threads as any[]).map((t: any) => ({
         threadId: t._id,
         createdAt: t._creationTime,
         metadata: t.metadata,
@@ -108,7 +105,7 @@ export const get = query({
       return {
         threadId: thread._id,
         createdAt: thread._creationTime,
-        metadata: thread.metadata,
+        metadata: (thread as any).metadata,
       };
     } catch {
       return null;
@@ -123,13 +120,13 @@ export const getThreadMessages = query({
   },
   handler: async (ctx, args) => {
     try {
-      const messages = await ctx.db
+      const messages = await (ctx.db as any)
         .query('agent_messages')
-        .filter((q) => q.eq(q.field('threadId'), args.threadId))
+        .filter((q: any) => q.eq(q.field('threadId'), args.threadId))
         .order('asc')
         .take(100);
 
-      return messages.map((m) => ({
+      return (messages as any[]).map((m: any) => ({
         id: m._id,
         role: m.role,
         content: m.content,
@@ -148,12 +145,12 @@ export const remove = mutation({
   },
   handler: async (ctx, args) => {
     // Delete messages first
-    const messages = await ctx.db
+    const messages = await (ctx.db as any)
       .query('agent_messages')
-      .filter((q) => q.eq(q.field('threadId'), args.threadId))
+      .filter((q: any) => q.eq(q.field('threadId'), args.threadId))
       .collect();
 
-    for (const msg of messages) {
+    for (const msg of messages as any[]) {
       await ctx.db.delete(msg._id);
     }
 

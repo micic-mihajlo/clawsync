@@ -9,4 +9,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    allowedHosts: [
+      'ubuntu-8gb-nbg1-1.tail706c84.ts.net',
+    ],
+  },
 });

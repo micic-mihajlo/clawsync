@@ -56,7 +56,7 @@ export const send = action({
 
     try {
       // Create or continue thread
-      const thread = args.threadId
+      const { thread } = args.threadId
         ? await clawsyncAgent.continueThread(ctx, { threadId: args.threadId })
         : await clawsyncAgent.createThread(ctx, {});
 
@@ -74,7 +74,7 @@ export const send = action({
 
       return {
         response: result.text,
-        threadId: thread.threadId,
+        threadId: (thread as any).threadId ?? args.threadId,
       };
     } catch (error) {
       console.error('Chat error:', error);
@@ -103,7 +103,7 @@ export const stream = internalAction({
       throw new Error('Rate limit exceeded');
     }
 
-    const thread = args.threadId
+    const { thread } = args.threadId
       ? await clawsyncAgent.continueThread(ctx, { threadId: args.threadId })
       : await clawsyncAgent.createThread(ctx, {});
 
@@ -114,7 +114,7 @@ export const stream = internalAction({
 
     return {
       response: result.text,
-      threadId: thread.threadId,
+      threadId: (thread as any).threadId ?? args.threadId,
     };
   },
 });
@@ -128,9 +128,10 @@ export const getHistory = action({
     try {
       const messages = await clawsyncAgent.listMessages(ctx, {
         threadId: args.threadId,
+        paginationOpts: { numItems: 100, cursor: null },
       });
 
-      return { messages };
+      return { messages: messages.page };
     } catch {
       return { messages: [] };
     }
@@ -157,7 +158,7 @@ export const apiSend = internalAction({
 
     try {
       // Create or continue thread
-      const thread = args.threadId
+      const { thread } = args.threadId
         ? await clawsyncAgent.continueThread(ctx, { threadId: args.threadId })
         : await clawsyncAgent.createThread(ctx, {});
 
@@ -179,7 +180,7 @@ export const apiSend = internalAction({
 
       return {
         response: result.text,
-        threadId: thread.threadId,
+        threadId: (thread as any).threadId ?? args.threadId,
         tokensUsed: (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
         inputTokens: usage.promptTokens ?? 0,
         outputTokens: usage.completionTokens ?? 0,

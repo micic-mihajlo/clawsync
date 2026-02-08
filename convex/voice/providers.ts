@@ -1,17 +1,14 @@
 'use node';
 
-import { internalAction, internalQuery, internalMutation } from '../_generated/server';
+import { internalAction } from '../_generated/server';
 import { v } from 'convex/values';
 import { internal } from '../_generated/api';
 
+// Note: queries and mutations are in ./queries.ts (non-node runtime)
+// Actions below reference them via internal.voice.queries.*
+
 /**
- * Voice Provider Abstraction
- *
- * Supports multiple voice providers:
- * - ElevenLabs: Industry-leading voice synthesis
- * - NVIDIA Personaplex: NVIDIA's voice AI platform
- *
- * Each provider has its own implementation but shares a common interface.
+ * Voice Provider Actions (Node.js runtime)
  */
 
 export interface VoiceConfig {
@@ -39,48 +36,6 @@ export interface SpeechToTextResult {
   }>;
 }
 
-// Get the default voice provider
-export const getDefaultProvider = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const provider = await ctx.db
-      .query('voiceProviders')
-      .filter((q) => q.eq(q.field('isDefault'), true))
-      .first();
-
-    if (!provider) {
-      // Fallback to first enabled provider
-      return await ctx.db
-        .query('voiceProviders')
-        .filter((q) => q.eq(q.field('enabled'), true))
-        .first();
-    }
-
-    return provider;
-  },
-});
-
-// Get provider by ID
-export const getProvider = internalQuery({
-  args: {
-    providerId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query('voiceProviders')
-      .withIndex('by_provider', (q) => q.eq('providerId', args.providerId))
-      .first();
-  },
-});
-
-// List all voice providers
-export const listProviders = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query('voiceProviders').collect();
-  },
-});
-
 // Text-to-speech using configured provider
 export const textToSpeech = internalAction({
   args: {
@@ -89,26 +44,24 @@ export const textToSpeech = internalAction({
     voiceId: v.optional(v.string()),
     options: v.optional(v.any()),
   },
-  handler: async (ctx, args) => {
-    // Get provider config
-    const provider = args.providerId
-      ? await ctx.runQuery(internal.voice.providers.getProvider, {
+  handler: async (ctx, args): Promise<TextToSpeechResult> => {
+    const provider: any = args.providerId
+      ? await ctx.runQuery(internal.voice.queries.getProvider, {
           providerId: args.providerId,
         })
-      : await ctx.runQuery(internal.voice.providers.getDefaultProvider);
+      : await ctx.runQuery(internal.voice.queries.getDefaultProvider);
 
     if (!provider || !provider.enabled) {
       throw new Error('No voice provider available');
     }
 
-    // Get API key from environment
-    const apiKey = process.env[provider.apiKeyEnvVar];
+    const apiKey: string = process.env[provider.apiKeyEnvVar]!;
     if (!apiKey) {
       throw new Error(`Missing API key: ${provider.apiKeyEnvVar}`);
     }
 
-    const config = provider.config ? JSON.parse(provider.config) : {};
-    const voiceId = args.voiceId ?? config.defaultVoiceId;
+    const config: Record<string, unknown> = provider.config ? JSON.parse(provider.config) : {};
+    const voiceId: string = args.voiceId ?? (config.defaultVoiceId as string);
 
     switch (provider.providerId) {
       case 'elevenlabs':
@@ -116,7 +69,7 @@ export const textToSpeech = internalAction({
           text: args.text,
           voiceId,
           apiKey,
-          options: { ...config, ...args.options },
+          options: { ...config, ...(args.options as Record<string, unknown> | undefined) },
         });
 
       case 'personaplex':
@@ -124,7 +77,7 @@ export const textToSpeech = internalAction({
           text: args.text,
           voiceId,
           apiKey,
-          options: { ...config, ...args.options },
+          options: { ...config, ...(args.options as Record<string, unknown> | undefined) },
         });
 
       default:
@@ -140,34 +93,33 @@ export const speechToText = internalAction({
     providerId: v.optional(v.string()),
     options: v.optional(v.any()),
   },
-  handler: async (ctx, args) => {
-    const provider = args.providerId
-      ? await ctx.runQuery(internal.voice.providers.getProvider, {
+  handler: async (ctx, args): Promise<SpeechToTextResult> => {
+    const provider: any = args.providerId
+      ? await ctx.runQuery(internal.voice.queries.getProvider, {
           providerId: args.providerId,
         })
-      : await ctx.runQuery(internal.voice.providers.getDefaultProvider);
+      : await ctx.runQuery(internal.voice.queries.getDefaultProvider);
 
     if (!provider || !provider.enabled || !provider.supportsSTT) {
       throw new Error('No STT provider available');
     }
 
-    const apiKey = process.env[provider.apiKeyEnvVar];
+    const apiKey: string = process.env[provider.apiKeyEnvVar]!;
     if (!apiKey) {
       throw new Error(`Missing API key: ${provider.apiKeyEnvVar}`);
     }
 
-    const config = provider.config ? JSON.parse(provider.config) : {};
+    const config: Record<string, unknown> = provider.config ? JSON.parse(provider.config) : {};
 
     switch (provider.providerId) {
       case 'elevenlabs':
-        // ElevenLabs doesn't have native STT, could use Whisper or similar
         throw new Error('ElevenLabs STT not implemented - use alternative provider');
 
       case 'personaplex':
         return await personaplexSTT({
           audioUrl: args.audioUrl,
           apiKey,
-          options: { ...config, ...args.options },
+          options: { ...config, ...(args.options as Record<string, unknown> | undefined) },
         });
 
       default:
@@ -176,63 +128,10 @@ export const speechToText = internalAction({
   },
 });
 
-// Create voice session
-export const createSession = internalMutation({
-  args: {
-    providerId: v.string(),
-    voiceId: v.optional(v.string()),
-    threadId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const sessionId = crypto.randomUUID();
-
-    await ctx.db.insert('voiceSessions', {
-      sessionId,
-      threadId: args.threadId,
-      providerId: args.providerId,
-      voiceId: args.voiceId,
-      status: 'active',
-      durationSecs: 0,
-      startedAt: Date.now(),
-    });
-
-    return { sessionId };
-  },
-});
-
-// End voice session
-export const endSession = internalMutation({
-  args: {
-    sessionId: v.string(),
-    durationSecs: v.number(),
-    tokensUsed: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const session = await ctx.db
-      .query('voiceSessions')
-      .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
-      .first();
-
-    if (!session) {
-      throw new Error('Session not found');
-    }
-
-    await ctx.db.patch(session._id, {
-      status: 'ended',
-      durationSecs: args.durationSecs,
-      tokensUsed: args.tokensUsed,
-      endedAt: Date.now(),
-    });
-  },
-});
-
 // ============================================
 // Provider Implementations
 // ============================================
 
-/**
- * ElevenLabs TTS Implementation
- */
 async function elevenLabsTTS(config: {
   text: string;
   voiceId: string;
@@ -273,9 +172,6 @@ async function elevenLabsTTS(config: {
   }
 
   const audio = await response.arrayBuffer();
-
-  // Estimate duration based on text length (rough approximation)
-  // Average speaking rate: ~150 words per minute
   const wordCount = text.split(/\s+/).length;
   const estimatedDurationMs = (wordCount / 150) * 60 * 1000;
 
@@ -291,9 +187,6 @@ async function elevenLabsTTS(config: {
   };
 }
 
-/**
- * NVIDIA Personaplex TTS Implementation
- */
 async function personaplexTTS(config: {
   text: string;
   voiceId: string;
@@ -306,20 +199,22 @@ async function personaplexTTS(config: {
   const sampleRate = (options.sampleRate as number) ?? 22050;
   const format = (options.format as string) ?? 'mp3';
 
+  const bodyObj: Record<string, unknown> = {
+    text,
+    voice_id: voiceId,
+    sample_rate: sampleRate,
+    output_format: format,
+  };
+  if (options.emotion) bodyObj.emotion = options.emotion;
+  if (options.speed) bodyObj.speed = options.speed;
+
   const response = await fetch(`${baseUrl}/tts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      text,
-      voice_id: voiceId,
-      sample_rate: sampleRate,
-      output_format: format,
-      ...(options.emotion && { emotion: options.emotion }),
-      ...(options.speed && { speed: options.speed }),
-    }),
+    body: JSON.stringify(bodyObj),
   });
 
   if (!response.ok) {
@@ -343,9 +238,6 @@ async function personaplexTTS(config: {
   };
 }
 
-/**
- * NVIDIA Personaplex STT Implementation
- */
 async function personaplexSTT(config: {
   audioUrl: string;
   apiKey: string;
@@ -356,7 +248,6 @@ async function personaplexSTT(config: {
   const baseUrl = (options.baseUrl as string) ?? 'https://api.nvidia.com/personaplex/v1';
   const language = (options.language as string) ?? 'en';
 
-  // Fetch audio data
   const audioResponse = await fetch(audioUrl);
   if (!audioResponse.ok) {
     throw new Error(`Failed to fetch audio: ${audioResponse.status}`);
@@ -367,18 +258,20 @@ async function personaplexSTT(config: {
     String.fromCharCode(...new Uint8Array(audioData))
   );
 
+  const bodyObj: Record<string, unknown> = {
+    audio: audioBase64,
+    language,
+  };
+  if (options.punctuate !== undefined) bodyObj.punctuate = options.punctuate;
+  if (options.timestamps !== undefined) bodyObj.timestamps = options.timestamps;
+
   const response = await fetch(`${baseUrl}/stt`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      audio: audioBase64,
-      language,
-      ...(options.punctuate !== undefined && { punctuate: options.punctuate }),
-      ...(options.timestamps !== undefined && { timestamps: options.timestamps }),
-    }),
+    body: JSON.stringify(bodyObj),
   });
 
   if (!response.ok) {

@@ -1,5 +1,5 @@
 import { Agent } from '@convex-dev/agent';
-import { components, internal } from '../_generated/api';
+import { components } from '../_generated/api';
 import { anthropic } from '@ai-sdk/anthropic';
 
 /**
@@ -15,16 +15,8 @@ import { anthropic } from '@ai-sdk/anthropic';
  */
 export const clawsyncAgent = new Agent(components.agent, {
   name: 'ClawSync Agent',
-  chat: anthropic('claude-sonnet-4-20250514'),
-  textEmbedding: anthropic.textEmbeddingModel('voyage-3'),
-  instructions: async (ctx) => {
-    // Load soul document and system prompt from agentConfig
-    const config = await ctx.runQuery(internal.agentConfig.getConfig);
-    if (!config) {
-      return 'You are a helpful AI assistant.';
-    }
-    return `${config.soulDocument}\n\n${config.systemPrompt}`;
-  },
+  chat: anthropic('claude-sonnet-4-20250514') as any,
+  instructions: 'You are a helpful AI assistant.',
   // Tools are loaded dynamically - see toolLoader.ts
   tools: {},
 });

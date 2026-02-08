@@ -197,19 +197,18 @@ export const fetchMentions = action({
   args: {
     sinceId: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const bearerToken = process.env.X_BEARER_TOKEN;
+  handler: async (ctx, args): Promise<any> => {
+    const bearerToken: string | undefined = process.env.X_BEARER_TOKEN;
     if (!bearerToken) {
       throw new Error('X_BEARER_TOKEN not configured');
     }
 
-    const config = await ctx.runQuery(internal.xTwitter.getConfigInternal);
+    const config: any = await ctx.runQuery(internal.xTwitter.getConfigInternal);
     if (!config?.enabled || !config?.username) {
       throw new Error('X/Twitter integration not configured');
     }
 
-    // Get user ID from username
-    const userResponse = await fetch(
+    const userResponse: Response = await fetch(
       `https://api.twitter.com/2/users/by/username/${config.username}`,
       {
         headers: { Authorization: `Bearer ${bearerToken}` },
@@ -220,16 +219,15 @@ export const fetchMentions = action({
       throw new Error('Failed to get user info');
     }
 
-    const userData = await userResponse.json();
-    const userId = userData.data.id;
+    const userData: any = await userResponse.json();
+    const userId: string = userData.data.id;
 
-    // Fetch mentions
-    let url = `https://api.twitter.com/2/users/${userId}/mentions?tweet.fields=author_id,created_at,public_metrics&expansions=author_id&user.fields=username,name,profile_image_url`;
+    let url: string = `https://api.twitter.com/2/users/${userId}/mentions?tweet.fields=author_id,created_at,public_metrics&expansions=author_id&user.fields=username,name,profile_image_url`;
     if (args.sinceId) {
       url += `&since_id=${args.sinceId}`;
     }
 
-    const response = await fetch(url, {
+    const response: Response = await fetch(url, {
       headers: { Authorization: `Bearer ${bearerToken}` },
     });
 
@@ -246,7 +244,7 @@ export const readTweet = action({
   args: {
     tweetId: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     const bearerToken = process.env.X_BEARER_TOKEN;
     if (!bearerToken) {
       throw new Error('X_BEARER_TOKEN not configured');

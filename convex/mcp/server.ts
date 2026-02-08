@@ -21,16 +21,16 @@ export const handler = httpAction(async (ctx, request) => {
 
   switch (method) {
     case 'tools/list':
-      return handleToolsList(ctx);
+      return handleToolsList(ctx as any);
 
     case 'tools/call':
-      return handleToolsCall(ctx, params);
+      return handleToolsCall(ctx as any, params);
 
     case 'resources/list':
-      return handleResourcesList(ctx);
+      return handleResourcesList();
 
     case 'resources/read':
-      return handleResourcesRead(ctx, params);
+      return handleResourcesRead(params);
 
     default:
       return new Response(
@@ -40,11 +40,11 @@ export const handler = httpAction(async (ctx, request) => {
   }
 });
 
-async function handleToolsList(ctx: Parameters<typeof httpAction>[0] extends (ctx: infer C, req: unknown) => unknown ? C : never) {
+async function handleToolsList(ctx: any): Promise<Response> {
   // Get all active + approved skills
   const skills = await ctx.runQuery(internal.skillRegistry.getActiveApproved);
 
-  const tools = skills.map((skill) => ({
+  const tools = skills.map((skill: any) => ({
     name: skill.name,
     description: skill.description,
     inputSchema: skill.config ? JSON.parse(skill.config).inputSchema : {},
@@ -57,23 +57,16 @@ async function handleToolsList(ctx: Parameters<typeof httpAction>[0] extends (ct
 }
 
 async function handleToolsCall(
-  ctx: Parameters<typeof httpAction>[0] extends (ctx: infer C, req: unknown) => unknown ? C : never,
-  params: { name: string; arguments: Record<string, unknown> }
-) {
-  // TODO: Implement tool call routing
-  // 1. Find skill by name
-  // 2. Run through security checker
-  // 3. Execute skill
-  // 4. Return result
-
+  _ctx: any,
+  _params: { name: string; arguments: Record<string, unknown> }
+): Promise<Response> {
   return new Response(
     JSON.stringify({ error: 'Not implemented' }),
     { status: 501, headers: { 'Content-Type': 'application/json' } }
   );
 }
 
-async function handleResourcesList(_ctx: Parameters<typeof httpAction>[0] extends (ctx: infer C, req: unknown) => unknown ? C : never) {
-  // TODO: Return knowledge base resources
+async function handleResourcesList(): Promise<Response> {
   return new Response(
     JSON.stringify({ resources: [] }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -81,10 +74,8 @@ async function handleResourcesList(_ctx: Parameters<typeof httpAction>[0] extend
 }
 
 async function handleResourcesRead(
-  _ctx: Parameters<typeof httpAction>[0] extends (ctx: infer C, req: unknown) => unknown ? C : never,
   _params: { uri: string }
-) {
-  // TODO: Return knowledge base content
+): Promise<Response> {
   return new Response(
     JSON.stringify({ error: 'Not implemented' }),
     { status: 501, headers: { 'Content-Type': 'application/json' } }

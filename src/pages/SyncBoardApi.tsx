@@ -156,7 +156,7 @@ export function SyncBoardApi() {
               <div
                 key={key._id}
                 className={`key-card ${key._id === selectedKeyId ? 'selected' : ''} ${!key.isActive ? 'revoked' : ''}`}
-                onClick={() => setSelectedKeyId(key._id)}
+                onClick={() => setSelectedKeyId(key._id as any)}
               >
                 <div className="key-header">
                   <div className="key-info">

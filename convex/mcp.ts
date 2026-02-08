@@ -1,6 +1,6 @@
 'use node';
 
-import { internalAction, internalQuery, ActionCtx } from './_generated/server';
+import { internalAction, ActionCtx } from './_generated/server';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { checkSecurity } from './agent/security';
@@ -24,7 +24,7 @@ export const executeTool = internalAction({
 
     // Find the skill by name
     const skills = await ctx.runQuery(internal.skillRegistry.getActiveApproved);
-    const skill = skills.find((s) => s.name === args.toolName);
+    const skill = skills.find((s: any) => s.name === args.toolName);
 
     if (!skill) {
       return {
@@ -197,9 +197,9 @@ async function executeCodeSkill(
 }
 
 // List available MCP resources
-export const listResources = internalQuery({
+export const listResources = internalAction({
   args: {},
-  handler: async (ctx) => {
+  handler: async (_ctx) => {
     // Get knowledge bases or other resources
     // For now, return empty list - can be extended to include:
     // - Knowledge base entries
@@ -228,17 +228,17 @@ export const listResources = internalQuery({
 });
 
 // Read an MCP resource by URI
-export const readResource = internalQuery({
+export const readResource = internalAction({
   args: {
     uri: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     // Parse URI and fetch resource
     const uri = args.uri;
 
     if (uri.startsWith('kb://')) {
       // Knowledge base resource
-      const kbId = uri.replace('kb://', '');
+      const _kbId = uri.replace('kb://', '');
       // const kb = await ctx.db.get(kbId as any);
       // return kb?.content;
       return { error: 'Knowledge base not implemented yet' };
