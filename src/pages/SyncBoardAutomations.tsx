@@ -78,7 +78,6 @@ async function n8nFetch(path: string, opts?: RequestInit): Promise<any> {
 /* ─── Node Colors ─── */
 const NODE_COLORS: Record<string, string> = {
   'webhook': '#ea5b26',
-  'httpRequest': '#3b82f6',
   'http': '#3b82f6',
   'filter': '#f59e0b',
   'set': '#8b5cf6',
