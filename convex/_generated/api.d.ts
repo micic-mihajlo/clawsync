@@ -19,6 +19,7 @@ import type * as agentMail from "../agentMail.js";
 import type * as api_auth from "../api/auth.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as apiUsage from "../apiUsage.js";
+import type * as automationGen from "../automationGen.js";
 import type * as automations from "../automations.js";
 import type * as channelConfig from "../channelConfig.js";
 import type * as channelSecrets from "../channelSecrets.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   "api/auth": typeof api_auth;
   apiKeys: typeof apiKeys;
   apiUsage: typeof apiUsage;
+  automationGen: typeof automationGen;
   automations: typeof automations;
   channelConfig: typeof channelConfig;
   channelSecrets: typeof channelSecrets;
