@@ -170,15 +170,22 @@ export function SyncBoardAutomations() {
       n8nFetch('/executions?limit=15'),
     ]);
 
+    // Build name lookup from workflows
+    const nameMap: Record<string, string> = {};
+    let wfs: Workflow[] = [];
+
     if (wfData) {
       setConnected(true);
-      const wfs = (wfData.data ?? []).map((w: any) => ({
-        id: w.id,
-        name: w.name,
-        active: w.active,
-        updatedAt: w.updatedAt,
-        nodeCount: w.nodes?.length ?? 0,
-      }));
+      wfs = (wfData.data ?? []).map((w: any) => {
+        nameMap[w.id] = w.name;
+        return {
+          id: w.id,
+          name: w.name,
+          active: w.active,
+          updatedAt: w.updatedAt,
+          nodeCount: w.nodes?.length ?? 0,
+        };
+      });
       setWorkflows(wfs);
       if (autoSelect && !selectedId && wfs.length > 0) {
         const first = wfs.find((w: Workflow) => w.active) ?? wfs[0];
@@ -190,7 +197,7 @@ export function SyncBoardAutomations() {
       setExecutions((execData.data ?? []).map((e: any) => ({
         id: e.id,
         workflowId: e.workflowId,
-        workflowName: e.workflowData?.name ?? 'Unknown',
+        workflowName: e.workflowData?.name ?? nameMap[e.workflowId] ?? 'Unknown',
         status: e.status,
         startedAt: e.startedAt,
         stoppedAt: e.stoppedAt,
